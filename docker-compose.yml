@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: stockanalysis-postgres
+    environment:
+      POSTGRES_USER: stockanalysis
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: stockanalysis
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockanalysis -d stockanalysis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stockanalysis-network
+
+  # Redis Cache with RediSearch (required for LangCache)
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: stockanalysis-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stockanalysis-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: stockanalysis-backend
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./backend:/app
+      - /app/.venv  # Don't mount virtual env from host
+    environment:
+      DATABASE_URL: postgresql://stockanalysis:devpassword@postgres:5432/stockanalysis
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_EMBEDDINGS_API_KEY: ${OPENAI_EMBEDDINGS_API_KEY}
+      MODEL_NAME: ${MODEL_NAME:-c1/openai/gpt-5/v-20250930}
+      MODEL_BASE_URL: ${MODEL_BASE_URL:-https://api.thesys.dev/v1/embed/}
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      HOST: 0.0.0.0
+      PORT: 8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - stockanalysis-network
+    stdin_open: true
+    tty: true
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8888 --reload"
+
+  # Frontend UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: stockanalysis-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Don't mount node_modules from host
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8888
+    depends_on:
+      - backend
+    networks:
+      - stockanalysis-network
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  stockanalysis-network:
+    driver: bridge

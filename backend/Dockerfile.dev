@@ -1,0 +1,30 @@
+# Development Dockerfile for Stock Analysis Backend
+# This version includes hot reload for faster development
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for faster dependency management
+RUN pip install uv
+
+# Copy all files (needed for package installation)
+COPY . .
+
+# Install dependencies including dev dependencies
+RUN uv pip install --system -e ".[dev]"
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Expose port
+EXPOSE 8888
+
+# For development, we'll use volume mounts for the code
+# and run with hot reload enabled
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8888", "--reload"]

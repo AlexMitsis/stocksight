@@ -1,0 +1,62 @@
+# Project-specific files
+CLAUDE.md
+.env
+.playwright-mcp/
+
+# Backend
+backend/.env
+backend/logs/
+backend/.venv/
+backend/__pycache__/
+backend/.pytest_cache/
+backend/htmlcov/
+backend/coverage.xml
+backend/.coverage
+backend/*.db
+backend/*.backup
+backend/*_REPORT.md
+backend/*_DOCUMENTATION.md
+backend/REFACTORING.md
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/coverage/
+frontend/.turbo/
+
+# Docs (internal planning/development docs)
+docs/archive/
+docs/stories/
+docs/EPIC*.md
+docs/STORY*.md
+docs/FUTURE_IMPROVEMENTS.md
+docs/OAUTH_SETUP_GUIDE.md
+PENDING_FIXES.md
+sample_portfolio.csv
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+__pycache__/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp
