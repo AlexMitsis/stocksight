@@ -15,6 +15,7 @@ backend/.coverage
 backend/*.db
 backend/*.backup
 backend/*_REPORT.md
+frontend/*_REPORT.md
 backend/*_DOCUMENTATION.md
 backend/REFACTORING.md
 

@@ -14,7 +14,7 @@ Stock Analysis combines Large Language Models (LLMs) with real-time market data 
 - **RAG Memory** - Context-aware responses using conversation history (pgvector)
 - **Real-Time Data** - Live stock prices, historical OHLCV, financials, news via yfinance
 
-## Quick Start with Docker 🐳
+## Quick Start with Docker
 
 The fastest way to run the entire application locally:
 
@@ -56,15 +56,16 @@ See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed documentation.
 - Expert financial analyst persona with GPT-5 via TheSys.dev
 - RAG-enhanced context retrieval from conversation history (pgvector)
 - Real-time streaming responses via Server-Sent Events
-- LangChain agent with 5 specialized tools for market data
+- LangChain agent with 7 specialized tools for market data
 
 ### Portfolio Management
-- **Holdings Tracking** - Add/edit/delete stock holdings with purchase dates
-- **CSV Import** - Bulk import holdings from spreadsheets
-- **Performance Dashboard** - Real-time metrics, charts, and analytics
+- **Transaction Management** - Full audit trail with BUY/SELL/DIVIDEND/TRANSFER_IN/TRANSFER_OUT/ADJUSTMENT types, atomic holdings sync
+- **CSV Import** - Bulk import holdings from spreadsheets with preview and duplicate detection
+- **Portfolio Analytics Dashboard** - Real-time metrics, charts, and analytics
   - Portfolio value over time (line chart)
   - Allocation breakdown (pie chart)
   - Gains/losses by holding (bar chart)
+  - Performance metrics (total return, gain/loss summary)
 - **VWAP Auto-Fill** - Automatically fetches Volume-Weighted Average Price for purchase dates
 
 ### Multi-Currency Support
@@ -78,6 +79,8 @@ See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed documentation.
 - JWT-based authentication with refresh tokens
 - Email/password registration and login
 - OAuth infrastructure ready (Google/GitHub)
+- Password reset flow with emailed tokens
+- Profile management (change email, password, preferred currency, country)
 - Protected routes and API endpoints
 
 ### Market Data Tools
@@ -85,32 +88,45 @@ See [DOCKER_SETUP.md](DOCKER_SETUP.md) for detailed documentation.
 - **Financials** - Balance sheet and fundamental data
 - **News** - Latest articles and press releases
 - **Company Logos** - Visual branding for holdings
+- **Currency Conversion** - Real-time exchange rates between EUR, GBP, CHF, USD
+- **VWAP Calculator** - Volume-Weighted Average Price for any ticker on any date
+
+### Dashboard
+- **Central Hub** - Landing page with quick navigation to chat, portfolio, and profile
+- **User Profile** - Account settings (email, password change, preferred currency, country)
 
 ## Technology Stack
 
 ### Backend
 - **Framework**: FastAPI (async web framework)
 - **Database**: PostgreSQL 16 with pgvector extension
-- **Cache**: Redis with RediSearch
+- **Cache**: Redis with RediSearch (semantic caching via LangCache)
 - **ORM**: SQLAlchemy 2.0 with async support
 - **Migrations**: Alembic
 - **AI/ML**:
-  - LangChain (agentic AI framework)
-  - LangGraph (workflow orchestration)
+  - LangChain (agentic AI framework with `create_agent`)
   - ChatOpenAI (GPT-5 via TheSys.dev API)
+  - OpenAI Embeddings (RAG via pgvector)
 - **Data**: yfinance (Yahoo Finance - stocks, forex, historical data)
-- **Auth**: JWT tokens with refresh mechanism
+- **Auth**: JWT tokens with refresh + bcrypt password hashing + OAuth (Google/GitHub)
 - **Logging**: Loguru (structured logging with rotation)
+- **Async Workers**: BackgroundTasks for context storage
+- **Observability**: Prometheus metrics for RAG performance and cache hit rates
 
 ### Frontend
 - **Framework**: React 19 with TypeScript
 - **Build Tool**: Vite
+- **Routing**: React Router v7
+- **HTTP Client**: axios with JWT interceptor and auto-refresh
+- **State Management**: React Context (auth), TanStack React Query (data fetching), Zustand
 - **UI Libraries**:
   - @thesysai/genui-sdk (C1Chat component)
-  - Shadcn/ui components
+  - Shadcn/ui components (Radix primitives + TailwindCSS)
   - Recharts (portfolio charts)
-  - TailwindCSS
-- **State**: React Context for auth
+  - Framer Motion (animations)
+  - Sonner (toast notifications)
+  - React Hook Form + Zod (form validation)
+- **Testing**: Vitest + React Testing Library
 
 ### Infrastructure
 - **Containerization**: Docker Compose (4 services)
@@ -158,45 +174,59 @@ stockanalysis/
 
 ### Backend Architecture
 
-**Single-File Application** (main.py):
-- FastAPI application setup with CORS middleware
-- LangChain agent configuration with GPT-5
-- Five tool definitions for market data retrieval
-- In-memory conversation checkpointer
-- Token counting and logging infrastructure
-- Streaming response generator
+**Modular Package Structure** (backend/app/):
+- `main.py` - FastAPI app entry with CORS, lifespan, middleware, router includes, Prometheus metrics
+- `core/` - Config (pydantic-settings), database (SQLAlchemy), security (JWT), cache (LangCache/Redis), logging (Loguru)
+- `routers/` - auth (register, login, OAuth, profile), chat (streaming + RAG), portfolio (holdings, transactions, analytics), market_data (VWAP)
+- `services/` - Business logic: auth, portfolio CRUD, portfolio performance, transactions (atomic), CSV import, currency (forex), OAuth, email, embeddings, context storage/retrieval
+- `agents/` - LangChain agent creation with 7 tools
+- `tools/` - Stock price, historical price, balance sheet, news, company logo, currency converter
+- `models/` - SQLAlchemy ORM models (User, Holding, Transaction, ConversationHistory, PortfolioSnapshot, PasswordResetToken) + Pydantic schemas
+- `middleware/` - Logging middleware with correlation IDs
 
-**API Endpoints**:
-- `POST /api/chat` - Main chat endpoint with SSE streaming
+**API Router Prefixes**:
+- `/api/auth/*` - Authentication and user management
+- `/api/chat` - Streaming chat with RAG
+- `/api/portfolio/*` - Holdings, transactions, chart data, CSV import
+- `/api/market-data/*` - VWAP and market data lookups
+- `/metrics` - Prometheus metrics endpoint
 
-**Agent Tools**:
-1. `get_stock_price(ticker)` - Current stock price
-2. `get_historical_stock_price(ticker, start_date, end_date)` - Historical OHLCV data
-3. `get_balance_sheet(ticker)` - Financial statement data
+**Agent Tools** (7):
+1. `get_stock_price(ticker, user_currency)` - Current stock price with currency conversion
+2. `get_historical_stock_price(ticker, start_date, end_date, user_currency)` - Historical OHLCV data
+3. `get_balance_sheet(ticker, user_currency)` - Financial statement data
 4. `get_stock_news(ticker)` - Recent news articles
 5. `get_company_logo(ticker)` - Company logo URL
+6. `convert_currency(amount, from_currency, to_currency)` - Currency conversion
+7. `get_exchange_rate(from_currency, to_currency)` - Exchange rate lookup
 
-**Data Flow**:
+**RAG Data Flow**:
 1. User sends message via frontend
-2. Backend receives request with thread ID for conversation continuity
-3. Token count logged for monitoring
-4. LangChain agent processes query and selects appropriate tools
-5. Tools fetch data from Yahoo Finance or logo services
-6. Agent generates response using GPT-5
-7. Response streamed back to frontend via SSE
-8. Conversation state saved in memory checkpointer
+2. Backend retrieves relevant context from pgvector (semantic search via OpenAI embeddings)
+3. Context injected into system prompt for awareness
+4. LangChain agent processes query with 7 available tools
+5. Tools fetch data (yfinance, forex) with automatic currency conversion
+6. Agent generates response using GPT-5 via TheSys.dev
+7. Response streamed back to frontend (plain text, not SSE formatted)
+8. Conversation turn stored in PostgreSQL via background task (non-blocking)
 
 ### Frontend Architecture
 
+**Page Structure** (React Router v7):
+- Public: Login, Signup, Forgot Password, Reset Password, OAuth Callback
+- Protected (JWT required): Dashboard, Chat, Portfolio, Portfolio Dashboard, Profile
+
 **Component Structure**:
-- Minimal React application leveraging pre-built UI components
-- Delegates chat interface to C1Chat component from genui-sdk
-- ThemeProvider for dark theme management
+- Chat interface delegates to C1Chat component from GenUI SDK (with custom `processMessage` for JWT injection)
+- Portfolio views use Recharts (line, pie, bar charts) with currency-aware data
+- Profile management forms with React Hook Form + Zod validation
+- Layout with AppLayout component, page transitions via Framer Motion
 
 **Communication**:
-- Direct API calls to `/api/chat` endpoint
-- Handles streaming responses from backend
-- Vite dev server proxies requests during development
+- axios instance with interceptor for automatic JWT token refresh
+- Custom `processMessage` function injects JWT from localStorage (bypasses axios for streaming)
+- Vite dev server proxies `/api` requests to backend during development
+- Toast notifications via Sonner
 
 ## Local Development Setup
 
@@ -282,9 +312,30 @@ The frontend will be available at `http://localhost:3000`
 
 ## API Reference
 
-### POST /api/chat
+### Authentication (`/api/auth`)
 
-Main chat endpoint for conversational stock analysis.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/register` | Register new user (email, password, currency, country) |
+| POST | `/login` | Login, returns access + refresh tokens |
+| POST | `/refresh` | Refresh access token |
+| GET | `/me` | Get current authenticated user info |
+| POST | `/forgot-password` | Request password reset email |
+| POST | `/reset-password` | Reset password with token |
+| POST | `/change-password` | Change password (authenticated) |
+| POST | `/change-email` | Change email address |
+| POST | `/change-currency` | Update preferred currency |
+| POST | `/change-country` | Update country |
+| GET | `/oauth/google` | Initiate Google OAuth flow |
+| GET | `/oauth/google/callback` | Google OAuth callback |
+| GET | `/oauth/github` | Initiate GitHub OAuth flow |
+| GET | `/oauth/github/callback` | GitHub OAuth callback |
+
+### Chat (`/api/chat`)
+
+**POST /api/chat** - Streaming AI stock analysis with RAG
+
+Requires authentication via JWT Bearer token.
 
 **Request Body**:
 ```json
@@ -292,41 +343,86 @@ Main chat endpoint for conversational stock analysis.
   "prompt": {
     "content": "string",     // User's message
     "id": "string",          // Unique message ID
-    "role": "string"         // Message role (user/assistant)
+    "role": "user"           // Message role
   },
   "threadId": "string",      // Conversation thread identifier
   "responseId": "string"     // Response identifier
 }
 ```
 
-**Response**:
-- Server-Sent Events (SSE) stream
-- Content-Type: `text/event-stream`
-- Streams response tokens in real-time
+**Response**: Plain text streaming (Content-Type: `text/plain`). Tokens yielded in real-time.
 
-**Headers**:
-- Cache-Control: `no-cache, no-transform`
-- Connection: `keep-alive`
+**POST /api/chat/debug** - Debug endpoint to inspect raw request data.
+
+### Portfolio (`/api/portfolio`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/holdings` | List all holdings with current prices |
+| GET | `/holdings/{id}` | Get single holding details |
+| GET | `/summary` | Portfolio summary (total value, gain/loss, return %) |
+| GET | `/allocation` | Allocation breakdown for pie chart |
+| GET | `/gains-losses` | Per-holding gain/loss for bar chart |
+| GET | `/historical-value` | Portfolio value over time for line chart |
+| POST | `/snapshot` | Create daily portfolio value snapshot |
+| POST | `/transactions` | Create transaction (BUY/SELL/DIVIDEND/TRANSFER_IN/TRANSFER_OUT/ADJUSTMENT) |
+| GET | `/transactions` | Filterable transaction history |
+| GET | `/transactions/{id}` | Get specific transaction |
+| PUT | `/transactions/{id}` | Update transaction (atomic holdings adjust) |
+| DELETE | `/transactions/{id}` | Delete transaction (reverses holdings effect) |
+| POST | `/import/preview` | Preview CSV import with validation |
+| POST | `/import/confirm` | Execute CSV import after confirmation |
+
+All portfolio endpoints require authentication. All support `?currency=EUR|GBP|CHF|USD` parameter.
+
+### Market Data (`/api/market-data`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/vwap/{ticker}` | Get VWAP for ticker on specific date (query: `?date=YYYY-MM-DD`) |
+
+### Infrastructure
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Root - API info |
+| GET | `/health` | Health check |
+| GET | `/metrics` | Prometheus metrics (RAG performance, cache rates) |
 
 ## Configuration
 
-### Backend Configuration
+### Environment Variables (.env)
 
-**Environment Variables** (.env):
-- `OPENAI_API_KEY` - Your OpenAI/TheSys API key
-- `OPENAI_BASE_URL` - API base URL (default: https://api.thesys.dev/v1/embed/)
-- `OPENAI_MODEL` - Model identifier (default: c1/openai/gpt-5/v-20250930)
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | Yes | - | API key for GPT-5 via TheSys.dev |
+| `OPENAI_EMBEDDINGS_API_KEY` | No | - | OpenAI API key for embeddings (RAG) |
+| `MODEL_NAME` | No | `c1/openai/gpt-5/v-20250930` | LLM model identifier |
+| `MODEL_BASE_URL` | No | `https://api.thesys.dev/v1/embed/` | LLM API base URL |
+| `DATABASE_URL` | Yes | - | PostgreSQL connection string |
+| `REDIS_URL` | No | - | Redis connection string (caching) |
+| `SECRET_KEY` | Yes | - | JWT signing key (`openssl rand -hex 32`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `30` | JWT access token TTL |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | JWT refresh token TTL |
+| `CORS_ORIGINS` | No | `http://localhost:3000,http://localhost:5173` | Allowed CORS origins |
+| `FRONTEND_URL` | No | `http://localhost:3000` | Frontend URL for OAuth redirects |
+| `GOOGLE_CLIENT_ID` | No | - | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | No | - | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | No | - | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | No | - | GitHub OAuth client secret |
+| `LOG_LEVEL` | No | `INFO` | Log level (DEBUG/INFO/WARNING/ERROR) |
+| `LOG_FORMAT` | No | `text` | Log format (`text` or `json`) |
 
-**Token Limits** (in main.py):
+### Token Limits (configured in code)
 - `TOKEN_LIMIT` - Maximum tokens per conversation (250,000)
 - `WARNING_THRESHOLD` - Warning threshold (200,000)
 - `MAX_HISTORY_MESSAGES` - Maximum messages to keep (20)
 
-**Logging Configuration**:
-- Log file: `logs/app.log`
+### Logging Configuration
+- Log file: `backend/logs/app.log`
 - Rotation: 500 MB
 - Retention: 10 days
-- Level: INFO
+- Level: Configurable via `LOG_LEVEL`
 
 ### Frontend Configuration
 
@@ -421,11 +517,14 @@ The application uses structured logging with Loguru:
 
 ## Known Limitations
 
-1. **No Rate Limiting**: API endpoints don't have rate limiting yet
-2. **Token Limits**: Long conversations may hit token limits
-3. **OAuth Not Configured**: Google/GitHub OAuth infrastructure exists but requires API keys
-4. **No Email Verification**: User registration doesn't verify email addresses
-5. **Single Region**: Exchange rates default to USD base; designed for US/EU markets
+1. **LangCache Requires RediSearch** - Semantic caching depends on Redis with RediSearch module; falls back silently without it
+2. **No WebSocket Support** - Chat uses SSE streaming (unidirectional), not full-duplex WebSockets
+3. **No Rate Limiting** - API endpoints don't have rate limiting yet
+4. **Token Limits** - Long conversations may hit per-conversation token limits
+5. **OAuth Not Configured** - Google/GitHub OAuth infrastructure exists but requires API keys in .env
+6. **No Email Verification** - SMTP configuration required for email verification and password reset
+7. **Single Region Focus** - Exchange rates default to USD base; designed for US/EU markets
+8. **Historical Forex Dependency** - Exchange rate data depends on yfinance availability
 
 ## Security Considerations
 
