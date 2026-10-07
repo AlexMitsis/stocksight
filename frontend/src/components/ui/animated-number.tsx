@@ -3,18 +3,12 @@ import { motion, useSpring, useTransform } from 'framer-motion';
 
 interface AnimatedNumberProps {
   value: number;
-  decimals?: number;
-  prefix?: string;
-  suffix?: string;
+  format: (value: number) => string;
 }
 
-export function AnimatedNumber({ value, decimals = 0, prefix = '', suffix = '' }: AnimatedNumberProps) {
+export function AnimatedNumber({ value, format }: AnimatedNumberProps) {
   const spring = useSpring(0, { duration: 1000, bounce: 0 });
-  const display = useTransform(spring, (current) => {
-    const formatted = current.toFixed(decimals);
-    const withCommas = formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `${prefix}${withCommas}${suffix}`;
-  });
+  const display = useTransform(spring, format);
 
   useEffect(() => {
     spring.set(value);

@@ -1,5 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnimatedNumber } from '@/components/ui/animated-number';
+import { formatCurrency } from '@/utils/number';
 
 interface PortfolioSummary {
   total_value: number;
@@ -55,17 +57,18 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ summary, isLoad
   const metrics = [
     {
       title: 'Total Value',
-      value: formatCurrency(summary.total_value, currency),
+      value: summary.total_value,
       description: `${summary.holdings_count} holding${summary.holdings_count !== 1 ? 's' : ''}`,
     },
     {
       title: 'Cost Basis',
-      value: formatCurrency(summary.total_cost_basis, currency),
+      value: summary.total_cost_basis,
       description: 'Total invested',
     },
     {
       title: 'Unrealized Gain/Loss',
-      value: formatCurrency(summary.total_gain_loss, currency, true),
+      value: summary.total_gain_loss,
+      showSign: true,
       description: `${isGain ? '+' : ''}${summary.total_return_pct.toFixed(2)}%`,
       valueColor: gainLossColor,
     },
@@ -80,7 +83,7 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ summary, isLoad
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${metric.valueColor || ''}`}>
-              {metric.value}
+              <AnimatedNumber value={metric.value} format={(v) => formatCurrency(v, currency, metric.showSign)} />
             </div>
             <p className="text-xs text-muted-foreground mt-1">{metric.description}</p>
           </CardContent>
@@ -89,33 +92,5 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({ summary, isLoad
     </div>
   );
 };
-
-// Helper function to format currency
-function formatCurrency(amount: number, currency: string, showSign: boolean = false): string {
-  const symbol = getCurrencySymbol(currency);
-  const absAmount = Math.abs(amount);
-  const formatted = absAmount.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  if (showSign) {
-    const sign = amount >= 0 ? '+' : '-';
-    return `${sign}${symbol}${formatted}`;
-  }
-
-  return `${symbol}${formatted}`;
-}
-
-// Helper function to get currency symbol
-function getCurrencySymbol(currency: string): string {
-  const symbols: Record<string, string> = {
-    USD: '$',
-    EUR: '€',
-    GBP: '£',
-    CHF: 'CHF ',
-  };
-  return symbols[currency] || currency;
-}
 
 export default PerformanceMetrics;

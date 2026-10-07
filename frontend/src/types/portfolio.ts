@@ -37,5 +37,3 @@ export interface TransactionListResponse {
   total_count: number;
   filters_applied: Record<string, string>;
 }
-
-export type { Holding, Transaction, TransactionListResponse };

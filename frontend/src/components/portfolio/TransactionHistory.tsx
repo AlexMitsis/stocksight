@@ -6,7 +6,10 @@ import { api } from '@/services/api';
 import type { Transaction } from '@/types/portfolio';
 import { toNumber, formatCurrency, formatQuantity } from '@/utils/number';
 import { AddTransactionForm } from './AddTransactionForm';
-import { Loader2, Plus, Trash2, Filter, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Loader2, Plus, Trash2, Filter, Pencil, Receipt } from 'lucide-react';
 
 interface TransactionHistoryProps {
   currency?: string;
@@ -94,11 +97,12 @@ export const TransactionHistory = ({
     try {
       setDeletingId(id);
       await api.delete(`/api/portfolio/transactions/${id}`);
+      toast.success(`Deleted ${type} transaction for ${ticker}`);
       fetchTransactions();
       onTransactionChange?.();
     } catch (error: any) {
       console.error('Failed to delete transaction:', error);
-      alert(error.response?.data?.detail || 'Failed to delete transaction');
+      toast.error(error.response?.data?.detail || 'Failed to delete transaction');
     } finally {
       setDeletingId(null);
     }
@@ -292,28 +296,32 @@ export const TransactionHistory = ({
 
         <CardContent className="pt-6">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading transactions...</span>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : transactions.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
-                {hasActiveFilters
-                  ? 'No transactions match your filters'
-                  : 'No transactions yet'}
-              </p>
-              {hasActiveFilters ? (
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
-              ) : (
+            hasActiveFilters ? (
+              <EmptyState
+                icon={Filter}
+                title="No matching transactions"
+                description="No transactions match your filters."
+              >
+                <Button variant="outline" onClick={clearFilters}>Clear Filters</Button>
+              </EmptyState>
+            ) : (
+              <EmptyState
+                icon={Receipt}
+                title="No transactions yet"
+                description="Record a buy, sell, transfer or dividend to start tracking your portfolio."
+              >
                 <Button onClick={() => setShowAddForm(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Record Your First Transaction
                 </Button>
-              )}
-            </div>
+              </EmptyState>
+            )
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

@@ -11,32 +11,17 @@ export function toNumber(value: string | number | null | undefined): number {
 }
 
 /**
- * Format a number as currency with proper symbol placement
+ * Format a number as currency (e.g. €1,234.56, CHF 1,234.56).
+ * With showSign, positive values get a leading "+".
  */
 export function formatCurrency(
   amount: string | number | null | undefined,
-  currency: string = 'USD'
+  currency: string = 'USD',
+  showSign: boolean = false
 ): string {
   const numValue = toNumber(amount);
-  const formatted = numValue.toFixed(2);
-
-  const symbols: Record<string, string> = {
-    EUR: '€',
-    GBP: '£',
-    USD: '$',
-    CHF: 'CHF ',
-  };
-
-  const symbol = symbols[currency] || '$';
-
-  // CHF goes before the number, others vary by locale
-  if (currency === 'CHF') {
-    return `${symbol}${formatted}`;
-  } else if (currency === 'EUR') {
-    return `€${formatted}`;
-  } else {
-    return `${symbol}${formatted}`;
-  }
+  const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(numValue);
+  return showSign && numValue >= 0 ? `+${formatted}` : formatted;
 }
 
 /**

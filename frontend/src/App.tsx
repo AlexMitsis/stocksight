@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -27,44 +28,26 @@ function App() {
           <Route path="/auth/google/callback" element={<OAuthCallbackPage provider="google" />} />
           <Route path="/auth/github/callback" element={<OAuthCallbackPage provider="github" />} />
 
-          {/* Protected routes */}
+          {/* Protected routes sharing the app shell (nav, theme toggle, transitions) */}
           <Route
-            path="/dashboard"
             element={
               <ProtectedRoute>
-                <DashboardPage />
+                <AppLayout />
               </ProtectedRoute>
             }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+          >
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/portfolio/dashboard" element={<PortfolioDashboardPage />} />
+          </Route>
+
+          {/* Chat is full-screen (GenUI SDK) - intentionally outside AppLayout */}
           <Route
             path="/chat"
             element={
               <ProtectedRoute>
                 <ChatPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/portfolio"
-            element={
-              <ProtectedRoute>
-                <PortfolioPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/portfolio/dashboard"
-            element={
-              <ProtectedRoute>
-                <PortfolioDashboardPage />
               </ProtectedRoute>
             }
           />
