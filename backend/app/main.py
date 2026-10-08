@@ -10,11 +10,9 @@ from loguru import logger
 from prometheus_client import make_asgi_app
 
 from app.core.config import settings
-from app.core.database import SessionLocal
 from app.core.logging import configure_logging
 from app.middleware import LoggingMiddleware
 from app.routers import chat, auth, portfolio, market_data
-from app.services.holdings_migration_service import HoldingsMigrationService
 
 # Configure logging
 configure_logging()
@@ -25,27 +23,7 @@ logger.info("Application starting...")
 async def lifespan(app: FastAPI):
     """
     Application lifespan handler for startup and shutdown events.
-
-    On startup:
-    - Migrates orphaned holdings to TRANSFER_IN transactions
     """
-    # Startup
-    logger.info("Running startup tasks...")
-
-    # Migrate orphaned holdings (holdings without backing transactions)
-    try:
-        db = SessionLocal()
-        migration_service = HoldingsMigrationService(db)
-        migrated_count = migration_service.migrate_orphaned_holdings()
-        if migrated_count > 0:
-            logger.info(f"Startup migration: Created {migrated_count} TRANSFER_IN transactions for orphaned holdings")
-        else:
-            logger.info("Startup migration: No orphaned holdings found")
-        db.close()
-    except Exception as e:
-        logger.error(f"Failed to run holdings migration on startup: {e}")
-        # Don't prevent app from starting
-
     yield
 
     # Shutdown

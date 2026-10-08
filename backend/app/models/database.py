@@ -224,7 +224,7 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     ticker = Column(String(20), nullable=False, index=True)
-    type = Column(String(10), nullable=False)  # 'BUY', 'SELL', 'DIVIDEND', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'
+    type = Column(String(20), nullable=False)  # 'BUY', 'SELL', 'DIVIDEND', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'
     quantity = Column(Numeric(15, 6), nullable=True)  # Null for dividends
     price = Column(Numeric(15, 2), nullable=True)  # Per-share price
     fees = Column(Numeric(15, 2), nullable=False, default=0)
