@@ -1,7 +1,5 @@
 # Stock Analysis Platform - Status
 
-**Last Updated:** January 31, 2026
-
 ---
 
 ## Current State
@@ -9,7 +7,7 @@
 ### Completed Work ✅
 
 **Epic 1: Core Backend Infrastructure** (8 stories) - COMPLETE
-- FastAPI backend with LangGraph agent
+- FastAPI backend with LangChain agent
 - Stock analysis tools (price, historical data, balance sheet, news, logos)
 - PostgreSQL + Docker setup
 - Redis caching layer
@@ -42,7 +40,7 @@
   - Preserved tool-level caching (stock prices, balance sheets, logos)
   - Ensures real-time accuracy for stock data
 
-**Epic 4: Portfolio Management** (3.5 stories complete)
+**Epic 4: Portfolio Management** (4 stories complete)
 - ✅ Story 4.1: Manual Portfolio Entry with CSV Import (8 points)
   - Holdings CRUD operations (Create, Read, Update, Delete)
   - CSV import with validation and duplicate detection
@@ -62,17 +60,26 @@
   - Weekend/holiday handling
   - Debounced API calls
   - Manual override support
-- 🟡 Story 4.5: Bug Fixes & Transaction History (13 points) - ~70% COMPLETE
-  - ✅ Atomic Transaction/Holdings Sync
-  - ✅ Currency Removal (auto-uses profile currency)
-  - ✅ Historical Exchange Rates for accurate conversions
-  - ✅ Portfolio Value Chart Fix (timedelta import)
-  - ✅ UI Fixes (pie chart clipping, legend removal)
-  - ✅ TransactionHistory Component
-  - ✅ AddTransactionForm Component
-  - ⏳ FIFO Realized Gains Calculation (Steps 6-10)
-  - ⏳ Portfolio Dashboard shortcut on homepage (Step 13)
-  - ⏳ Comprehensive testing (Step 14)
+- ✅ Story 4.5: Bug Fixes & Transaction History (13 points)
+  - Atomic transaction/holdings sync (holdings are only written via transactions)
+  - Historical exchange rates, TransactionHistory + AddTransactionForm
+  - FIX-007 (SELL rejection → 400) and FIX-008 (SELL delete cost basis) fixed
+  - ⏸️ FIFO realized gains (Step 10) deferred - tracked as FIX-003
+
+**Epic 5: Production Readiness & Polish** (1 story complete)
+- ✅ Story 5.1: Frontend Polish & UX
+  - Shared `AppLayout` layout route (nav, theme toggle, logout) for all pages except Chat
+  - Mobile slide-out nav (vaul), page transitions
+  - Count-up metrics, card hover / button press micro-interactions
+  - Loading skeletons, empty states, Sonner toasts
+- 📝 Story 5.2: TradingView Chart via MCP - Draft
+- 📝 Deployment & observability - Planned (`docs/OBSERVABILITY_AND_DEPLOYMENT_PLAN.md`)
+
+**Recent Fixes**
+- CSV import was broken: `transactions.type` was VARCHAR(10), too short for `TRANSFER_IN`/`TRANSFER_OUT` → migration 011 widens it to VARCHAR(20)
+- Removed obsolete startup holdings migration (crashed on every boot) and unused `PortfolioService` write methods
+- Reset `admin@test.com` portfolio (dev test data out of sync) and re-imported `sample_portfolio.csv`
+- Open items tracked in `PENDING_FIXES.md` (FIX-003, 009, 010, 011)
 
 ### What's Running
 
@@ -115,7 +122,7 @@ The application is fully functional with:
 
 **Backend:**
 - FastAPI 0.124.4
-- LangGraph 1.0.5 with Claude Sonnet 4.5
+- LangChain `create_agent` with `c1/openai/gpt-5` via TheSys C1 API
 - PostgreSQL 16 with pgvector 0.8.1
 - Redis Stack Server (with RediSearch)
 - SQLAlchemy 2.0 + Alembic
@@ -130,7 +137,7 @@ The application is fully functional with:
 
 **Infrastructure:**
 - Docker Compose (4 services)
-- Hot reload for development
+- Hot reload for development (backend only for now - see FIX-011)
 - Structured logging
 - Prometheus metrics at /metrics
 
@@ -181,45 +188,20 @@ The application is fully functional with:
 
 ## Next Steps
 
-### Option 1: Finish Story 4.5 - FIFO Gains & Final Testing (Recommended)
+### Option 1: Local Dev Experience (FIX-011) - Quick
+- Frontend hot reload in Docker (`server.watch.usePolling`) and documented host `npm run dev` workflow
 
-**Current Status:** ~70% complete - bug fixes done, advanced features pending
+### Option 2: Deployment & Observability (Epic 5)
+- Azure Bicep IaC, GitHub Actions CD, Prometheus + Grafana
+- Plan: `docs/OBSERVABILITY_AND_DEPLOYMENT_PLAN.md`
 
-**What's left:**
-- ⏳ Steps 6-10: FIFO Realized Gains Calculation
-- ⏳ Step 13: Portfolio Dashboard shortcut on homepage
-- ⏳ Step 14: Comprehensive end-to-end testing
-- 🐛 Fix FIX-007: SELL rejection returns HTTP 500 instead of 400
-- 🐛 Fix FIX-008: Deleting SELL uses sell price for cost_basis reversal
+### Option 3: Test Suite Health (FIX-010)
+- 26 failing / 40 erroring backend tests predate October 2026 work; clean up before relying on CI
 
-**Why finish this now:**
-- Transaction system is mostly built, just needs completion
-- FIFO gains useful for tax reporting
-- Testing will validate all the bug fixes
+### Option 4: Story 3.7 - Local Data Lake (21 points)
+- PostgreSQL data lake with S&P 500 stocks, DB-first agent
 
----
-
-### Option 2: Story 3.7 - Local Data Lake
-
-**Story 3.7:** Local Data Lake (21 points) - System design showcase
-- PostgreSQL data lake with S&P 500 stocks
-- Data ingestion pipeline
-- 100ms responses (vs 2s API calls)
-- Intelligent DB-first agent
-
-**Why this:** Major system design + data engineering demonstration
-
----
-
-### Option 3: Epic 5 - Production Readiness
-
-**Epic 5:** Production Readiness (30-35 points)
-- Comprehensive testing suite
-- CI/CD pipeline (GitHub Actions)
-- Monitoring & observability
-- Security hardening
-
-**Why this:** Shows production engineering, DevOps, SRE skills
+### Option 5: Story 5.2 - TradingView Charts in Chat (8 points)
 
 ### Optional Enhancements
 
@@ -264,7 +246,7 @@ docker-compose logs -f frontend
 **Check database migration:**
 ```bash
 docker-compose exec backend alembic current
-# Expected: 004_password_reset (head)
+# Expected: 011_widen_transaction_type (head)
 ```
 
 **Run tests:**
@@ -319,9 +301,9 @@ curl -X POST http://localhost:8888/api/chat \
 - **EPIC.md** - Master specification index (links to all epic files)
   - **EPIC_1.md** - Core Infrastructure & Testing (COMPLETE)
   - **EPIC_2.md** - Token Management & RAG Implementation (COMPLETE)
-  - **EPIC_3.md** - European Market Foundation (IN PROGRESS)
-  - **EPIC_4.md** - Portfolio Management (planned)
-  - **EPIC_5.md** - Production Readiness (planned)
+  - **EPIC_3.md** - European Market Foundation (COMPLETE)
+  - **EPIC_4.md** - Portfolio Management (COMPLETE except FIFO gains)
+  - **EPIC_5.md** - Production Readiness & Polish (IN PROGRESS)
 - **FUTURE_IMPROVEMENTS.md** - Deprioritized features (ETF tools, tax system)
 - **SYSTEM_ARCHITECTURE.md** - System design and data flows
 - **PRODUCT_VISION.md** - Product strategy and roadmap
@@ -342,13 +324,13 @@ curl -X POST http://localhost:8888/api/chat \
 - **RAG_QUALITY_GUIDE.md** - RAG testing and tuning best practices
 - **VECTOR_DATABASE_COMPARISON.md** - Why pgvector over Pinecone
 - **CHAT_STREAMING_FIX_SUMMARY_2025-12-29.md** - Critical LangChain agent fix
-- **EPIC_2_LANGCACHE_INTEGRATION.md** - LangCache implementation details
 - **CI_CD_DOCUMENTATION.md** - GitHub Actions setup
 
 ### Future Planning
-- **STORY_3.6_INTELLIGENT_QUERY_ROUTING.md** - Future story plan
 - **STORY_3.7_LOCAL_DATA_LAKE.md** - Future story plan
-- **MCP_INTEGRATION_PROPOSAL.md** - Model Context Protocol exploration
+- **STORY_5.2_TRADINGVIEW_CHART_MCP.md** - TradingView MCP integration (draft)
+- **OBSERVABILITY_AND_DEPLOYMENT_PLAN.md** - Azure deployment + monitoring plan
+- **PENDING_FIXES.md** - Open bugs and tech debt
 
 ### Archived Documentation
 See `docs/archive/completed-stories/` for:
@@ -428,10 +410,10 @@ See `docs/archive/completed-stories/` for:
 - Domain setup
 - Monitoring/alerting (Sentry, Datadog)
 - Database backup strategy
-- CI/CD pipeline
+- CI/CD pipeline (deployment stage - see OBSERVABILITY_AND_DEPLOYMENT_PLAN.md)
 
 ---
 
-**Epic 3 Complete! Story 4.5 ~70% done - ready to finish FIFO gains or start Story 3.7!** 🚀
+**Epics 1-4 complete, Story 5.1 complete. Next: local dev fixes (FIX-011), then deployment.**
 
 For detailed implementation plans and specifications, see EPIC.md (index) and individual epic files (EPIC_1.md through EPIC_5.md). Deprioritized features are documented in FUTURE_IMPROVEMENTS.md.
