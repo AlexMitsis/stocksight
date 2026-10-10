@@ -363,7 +363,22 @@ Edit files in `backend/app/` or `frontend/src/`
 ### 2. Changes Auto-Reload
 Both backend and frontend have hot reload enabled:
 - Backend: Uvicorn `--reload` mode
-- Frontend: Vite development server
+- Frontend: Vite development server (polls for changes, because file-change events don't fire on the Windows `/mnt/c` filesystem)
+
+**Option A - everything in Docker:**
+```bash
+docker compose up        # frontend at http://localhost:3000
+```
+
+**Option B - frontend on your own terminal, rest in Docker:**
+```bash
+docker compose up -d postgres redis backend   # or: docker compose stop frontend
+cd frontend
+npm install --legacy-peer-deps                # first time / after package changes
+npm run dev                                   # http://localhost:3000, proxies /api to localhost:8888
+```
+Run `npm run dev` from `frontend/`, and stop the Docker frontend first (it also uses port 3000).
+The first page load after a dependency change can take a minute while Vite pre-bundles dependencies.
 
 ### 3. Add Database Changes
 ```bash

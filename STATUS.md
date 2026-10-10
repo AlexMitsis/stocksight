@@ -79,7 +79,8 @@
 - CSV import was broken: `transactions.type` was VARCHAR(10), too short for `TRANSFER_IN`/`TRANSFER_OUT` → migration 011 widens it to VARCHAR(20)
 - Removed obsolete startup holdings migration (crashed on every boot) and unused `PortfolioService` write methods
 - Reset `admin@test.com` portfolio (dev test data out of sync) and re-imported `sample_portfolio.csv`
-- Open items tracked in `PENDING_FIXES.md` (FIX-003, 009, 010, 011)
+- Frontend hot reload fixed (Vite polling) and host `npm run dev` workflow working/documented
+- Open items tracked in `PENDING_FIXES.md` (FIX-003, 009, 010)
 
 ### What's Running
 
@@ -137,7 +138,7 @@ The application is fully functional with:
 
 **Infrastructure:**
 - Docker Compose (4 services)
-- Hot reload for development (backend only for now - see FIX-011)
+- Hot reload for development (Vite uses polling on the `/mnt/c` mount)
 - Structured logging
 - Prometheus metrics at /metrics
 
@@ -188,20 +189,17 @@ The application is fully functional with:
 
 ## Next Steps
 
-### Option 1: Local Dev Experience (FIX-011) - Quick
-- Frontend hot reload in Docker (`server.watch.usePolling`) and documented host `npm run dev` workflow
-
-### Option 2: Deployment & Observability (Epic 5)
+### Option 1: Deployment & Observability (Epic 5)
 - Azure Bicep IaC, GitHub Actions CD, Prometheus + Grafana
 - Plan: `docs/OBSERVABILITY_AND_DEPLOYMENT_PLAN.md`
 
-### Option 3: Test Suite Health (FIX-010)
-- 26 failing / 40 erroring backend tests predate October 2026 work; clean up before relying on CI
+### Option 2: Test Suite Health (FIX-010)
+- 26 failing / 40 erroring backend tests and 4 obsolete frontend App tests; clean up before relying on CI
 
-### Option 4: Story 3.7 - Local Data Lake (21 points)
+### Option 3: Story 3.7 - Local Data Lake (21 points)
 - PostgreSQL data lake with S&P 500 stocks, DB-first agent
 
-### Option 5: Story 5.2 - TradingView Charts in Chat (8 points)
+### Option 4: Story 5.2 - TradingView Charts in Chat (8 points)
 
 ### Optional Enhancements
 
@@ -414,6 +412,6 @@ See `docs/archive/completed-stories/` for:
 
 ---
 
-**Epics 1-4 complete, Story 5.1 complete. Next: local dev fixes (FIX-011), then deployment.**
+**Epics 1-4 complete, Story 5.1 complete. Next: deployment.**
 
 For detailed implementation plans and specifications, see EPIC.md (index) and individual epic files (EPIC_1.md through EPIC_5.md). Deprioritized features are documented in FUTURE_IMPROVEMENTS.md.

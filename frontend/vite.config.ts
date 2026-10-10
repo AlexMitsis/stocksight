@@ -13,6 +13,9 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true, // Listen on all addresses (needed for Docker)
+    // The repo lives on the Windows filesystem (/mnt/c), where file-change events don't fire
+    // in WSL or in Docker bind mounts, so poll for changes instead.
+    watch: { usePolling: true, interval: 300 },
     proxy: {
       '/api': {
         target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8888',

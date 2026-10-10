@@ -290,10 +290,10 @@ cd frontend
 
 2. Install dependencies:
 ```bash
-npm install
+npm install --legacy-peer-deps
 ```
 
-3. Start the development server:
+3. Start the development server (stop the Docker `frontend` service first - both use port 3000):
 ```bash
 npm run dev
 ```
