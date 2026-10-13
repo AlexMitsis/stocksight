@@ -105,15 +105,18 @@ class ContextRetrievalService:
 
             # Semantic search using pgvector cosine similarity
             # Filter by thread_id AND user_id for data isolation
+            distance = ConversationEmbedding.embedding.cosine_distance(query_embedding).label(
+                "distance"
+            )
             results = (
-                db_session.query(ConversationEmbedding)
+                db_session.query(ConversationEmbedding, distance)
                 .filter(
                     and_(
                         ConversationEmbedding.thread_id == thread_id,
                         ConversationEmbedding.user_id == user_id,
                     )
                 )
-                .order_by(ConversationEmbedding.embedding.cosine_distance(query_embedding))
+                .order_by(distance)
                 .limit(top_k)
                 .all()
             )
@@ -133,12 +136,8 @@ class ContextRetrievalService:
 
             # Extract and format context with metadata
             contexts = []
-            for result in results:
-                # Calculate similarity score (1 - distance = similarity)
-                # Note: This calculates the distance again, which is not ideal
-                # but SQLAlchemy doesn't expose the distance from ORDER BY
-                distance = result.embedding.cosine_distance(query_embedding)
-                similarity = 1 - distance
+            for result, result_distance in results:
+                similarity = 1 - result_distance  # cosine similarity
 
                 contexts.append(
                     {
