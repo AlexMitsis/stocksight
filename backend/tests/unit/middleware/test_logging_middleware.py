@@ -66,8 +66,8 @@ class TestLoggingMiddleware:
 
     @pytest.fixture
     def client(self, app):
-        """Create test client."""
-        return TestClient(app)
+        """Create test client that returns 500 responses instead of re-raising app errors."""
+        return TestClient(app, raise_server_exceptions=False)
 
     def test_middleware_adds_correlation_id_to_response(self, client):
         """Test that middleware adds X-Correlation-ID to response headers."""
@@ -219,7 +219,10 @@ class TestLoggingConfiguration:
         """Test that filter handles missing correlation ID gracefully."""
         from app.core.logging import correlation_id_filter
 
-        # Given: no correlation ID set
+        # Given: no correlation ID set (earlier tests may have set one in this context)
+        from app.core.correlation import _correlation_id
+
+        _correlation_id.set(None)
         record = {"extra": {}}
 
         # When

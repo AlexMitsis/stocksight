@@ -7,9 +7,90 @@ This file contains fixtures that mock external API calls to ensure:
 - Deterministic results (same data every time)
 """
 
+import hashlib
+import math
+import os
+import re
+
 import pytest
 from unittest.mock import MagicMock
 import pandas as pd
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+
+# Point the app at a dedicated test database BEFORE any app module is imported
+# (app.core.config reads DATABASE_URL once at import time).
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+if not TEST_DATABASE_URL:
+    raise RuntimeError("TEST_DATABASE_URL must be set to a Postgres database ending in '_test'")
+if not make_url(TEST_DATABASE_URL).database.endswith("_test"):
+    raise RuntimeError(f"Refusing to run tests against non-test database: {TEST_DATABASE_URL}")
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_database():
+    """Create the test database if needed and migrate it to the latest schema."""
+    from alembic import command
+    from alembic.config import Config
+
+    url = make_url(TEST_DATABASE_URL)
+    admin_engine = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin_engine.connect() as conn:
+        exists = conn.execute(
+            text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": url.database}
+        ).scalar()
+        if not exists:
+            conn.execute(text(f'CREATE DATABASE "{url.database}"'))
+    admin_engine.dispose()
+
+    command.upgrade(Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini")), "head")
+
+
+DB_FIXTURES = {"db_session", "test_users", "fastapi_test_client", "client"}
+
+
+@pytest.fixture(autouse=True)
+def clean_tables(request):
+    """Empty all tables after each test that uses the database (via one of DB_FIXTURES)."""
+    yield
+    if not DB_FIXTURES.intersection(request.fixturenames):
+        return
+    from app.core.database import Base, engine
+
+    tables = ", ".join(f'"{t.name}"' for t in Base.metadata.sorted_tables)
+    with engine.begin() as conn:
+        conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+
+
+@pytest.fixture(autouse=True)
+def disable_redis_cache(monkeypatch):
+    """Run tools uncached so results don't depend on whether a Redis server is reachable.
+    Cache tests install their own mock client on top of this."""
+    monkeypatch.setattr("app.core.cache.redis_client", None)
+
+
+@pytest.fixture(autouse=True)
+def reset_service_singletons():
+    """Drop cached service instances so a mock captured by one test can't leak into the next."""
+    yield
+    import app.services.context_retrieval_service as retrieval
+    import app.services.context_storage_service as storage
+    import app.services.embedding_service as embedding
+
+    retrieval._context_retrieval_service = None
+    storage._context_storage_service = None
+    embedding._embedding_service = None
+
+
+@pytest.fixture
+def db_session():
+    """SQLAlchemy session bound to the test database."""
+    from app.core.database import SessionLocal
+
+    session = SessionLocal()
+    yield session
+    session.close()
 
 
 @pytest.fixture
@@ -74,6 +155,44 @@ def mock_yfinance_ticker(mocker):
     mocker.patch("yfinance.Ticker", return_value=mock_ticker)
 
     return mock_ticker
+
+
+def _fake_embedding(text: str) -> list:
+    """Deterministic bag-of-words vector: texts sharing words get similar embeddings."""
+    vec = [0.0] * 1536
+    vec[0] = 1.0  # never all-zero (cosine distance is undefined for zero vectors)
+    for word in re.findall(r"\w+", text.lower()):
+        vec[int(hashlib.md5(word.encode()).hexdigest(), 16) % 1536] += 1.0
+    norm = math.sqrt(sum(v * v for v in vec))
+    return [v / norm for v in vec]
+
+
+@pytest.fixture(autouse=True)
+def fake_embeddings(request, mocker):
+    """
+    Replace OpenAI embedding calls with _fake_embedding so tests never hit the paid API.
+
+    Tests marked `quality` measure real retrieval accuracy and keep real embeddings;
+    they are deselected by default and run explicitly with `pytest -m quality`.
+    """
+    if request.node.get_closest_marker("quality"):
+        return
+
+    async def aembed_query(self, text):
+        return _fake_embedding(text)
+
+    async def aembed_documents(self, texts, *args, **kwargs):
+        return [_fake_embedding(t) for t in texts]
+
+    mocker.patch("langchain_openai.OpenAIEmbeddings.aembed_query", aembed_query)
+    mocker.patch("langchain_openai.OpenAIEmbeddings.aembed_documents", aembed_documents)
+    mocker.patch(
+        "langchain_openai.OpenAIEmbeddings.embed_query", lambda self, text: _fake_embedding(text)
+    )
+    mocker.patch(
+        "langchain_openai.OpenAIEmbeddings.embed_documents",
+        lambda self, texts, *a, **k: [_fake_embedding(t) for t in texts],
+    )
 
 
 @pytest.fixture
@@ -149,7 +268,8 @@ def mock_agent(mocker):
         ]
     )
 
-    mocker.patch("app.agents.stock_analyst.agent", mock_agent)
+    # chat.py does `from app.agents.stock_analyst import agent`, so patch its reference
+    mocker.patch("app.routers.chat.agent", mock_agent)
 
     return mock_agent
 
@@ -165,9 +285,26 @@ def test_settings(monkeypatch):
 
 
 @pytest.fixture
-def fastapi_test_client():
-    """Create a test client for FastAPI integration tests."""
+def test_users(db_session):
+    """Users with ids 1 and 2, for tests that reference user_id directly."""
+    from app.models.database import User
+
+    users = [User(email=f"user{i}@test.com", hashed_password="not-a-real-hash") for i in (1, 2)]
+    db_session.add_all(users)
+    db_session.commit()
+    for user in users:
+        db_session.refresh(user)
+        db_session.expunge(user)  # usable from the TestClient thread without this session
+    return users
+
+
+@pytest.fixture
+def fastapi_test_client(test_users):
+    """Test client for FastAPI integration tests, authenticated as user 1."""
     from fastapi.testclient import TestClient
+    from app.core.security import get_current_active_user
     from app.main import app
 
-    return TestClient(app)
+    app.dependency_overrides[get_current_active_user] = lambda: test_users[0]
+    yield TestClient(app)
+    app.dependency_overrides.clear()

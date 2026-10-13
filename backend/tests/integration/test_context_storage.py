@@ -213,7 +213,7 @@ class TestContextStorageIntegration:
             # Verify graceful failure
             assert success is False
             mock_db.rollback.assert_called_once()
-            mock_db.close.assert_called_once()
+            mock_db.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_user_isolation_in_storage(self):

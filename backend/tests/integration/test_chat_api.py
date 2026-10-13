@@ -53,7 +53,7 @@ class TestChatAPI:
 
         # Then
         assert response.status_code == 200
-        assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+        assert response.headers["content-type"] == "text/plain; charset=utf-8"  # GenUI SDK expects plain text
 
     def test_chat_endpoint_streams_response(
         self, fastapi_test_client, sample_chat_request, mock_agent
@@ -70,7 +70,6 @@ class TestChatAPI:
         content = response.text
         assert len(content) > 0
 
-    @pytest.mark.skip(reason="Agent mocking needs adjustment")
     def test_chat_endpoint_handles_thread_id(self, fastapi_test_client, mock_agent):
         """
         Test that thread_id is properly handled.
@@ -93,20 +92,20 @@ class TestChatAPI:
         call_args = mock_agent.stream.call_args
         assert call_args[1]["config"]["configurable"]["thread_id"] == thread_id
 
-    @pytest.mark.skip(reason="Loguru logging tested manually")
     def test_chat_endpoint_logs_request(
-        self, fastapi_test_client, sample_chat_request, mock_agent, caplog
+        self, fastapi_test_client, sample_chat_request, mock_agent, mocker
     ):
         """
-        Test that requests are logged.
+        Test that requests are logged (Loguru bypasses caplog, so patch the router's logger).
         """
+        mock_logger = mocker.patch("app.routers.chat.logger")
+
         # When
-        with caplog.at_level("INFO"):
-            fastapi_test_client.post("/api/chat", json=sample_chat_request)
+        fastapi_test_client.post("/api/chat", json=sample_chat_request)
 
         # Then
-        assert "Received chat request" in caplog.text
-        assert sample_chat_request["threadId"] in caplog.text
+        logged = " ".join(str(call.args[0]) for call in mock_logger.info.call_args_list)
+        assert sample_chat_request["threadId"] in logged
 
     def test_chat_endpoint_handles_long_messages(self, fastapi_test_client, mock_agent):
         """

@@ -6,53 +6,18 @@ Tests user registration, login, token refresh, and protected endpoints.
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-from app.core.database import Base, get_db
+from app.core.database import get_db
 from app.main import app
 from app.models.database import User
 from app.services.auth_service import auth_service
 
 
-# Test database setup
-TEST_DATABASE_URL = "sqlite:///./test_auth.db"
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def override_get_db():
-    """Override database dependency with test database."""
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-
-@pytest.fixture(scope="function")
-def test_db():
-    """Create a fresh test database for each test."""
-    # Only create tables needed for auth tests (skip conversation_embeddings)
-    from app.models.database import User, PasswordResetToken
-
-    User.__table__.create(bind=engine, checkfirst=True)
-    PasswordResetToken.__table__.create(bind=engine, checkfirst=True)
-
-    yield
-
-    # Clean up
-    PasswordResetToken.__table__.drop(bind=engine, checkfirst=True)
-    User.__table__.drop(bind=engine, checkfirst=True)
-
-
 @pytest.fixture
-def client(test_db):
-    """Create a test client with test database."""
-    app.dependency_overrides[get_db] = override_get_db
+def client():
+    """Test client backed by the Postgres test database (see conftest.py)."""
     with TestClient(app) as test_client:
         yield test_client
-    app.dependency_overrides.clear()
 
 
 @pytest.mark.integration
@@ -252,7 +217,7 @@ class TestUserLogin:
         user_id = register_response.json()["user"]["id"]
 
         # Manually deactivate user in database
-        db = next(override_get_db())
+        db = next(get_db())
         user = db.query(User).filter(User.id == user_id).first()
         user.is_active = False
         db.commit()
@@ -438,7 +403,7 @@ class TestPasswordSecurity:
         )
 
         # Check database directly
-        db = next(override_get_db())
+        db = next(get_db())
         user = db.query(User).filter(User.email == "hashedpass@example.com").first()
 
         # Password should be hashed (bcrypt hash starts with $2b$)
@@ -520,7 +485,7 @@ class TestForgotPassword:
         )
 
         # Check that token was created
-        db = next(override_get_db())
+        db = next(get_db())
         tokens = db.query(PasswordResetToken).filter(
             PasswordResetToken.user_id == user_id,
             PasswordResetToken.is_used == False
@@ -557,7 +522,7 @@ class TestForgotPassword:
         )
 
         # Check that only one unused token exists (old one was invalidated)
-        db = next(override_get_db())
+        db = next(get_db())
         unused_tokens = db.query(PasswordResetToken).filter(
             PasswordResetToken.user_id == user_id,
             PasswordResetToken.is_used == False
@@ -587,7 +552,7 @@ class TestResetPassword:
         )
 
         # Create a reset token manually
-        db = next(override_get_db())
+        db = next(get_db())
         user = db.query(User).filter(User.email == "resetpass@example.com").first()
 
         raw_token, hashed_token = auth_service.generate_reset_token()
@@ -650,7 +615,7 @@ class TestResetPassword:
         )
 
         # Create an expired reset token
-        db = next(override_get_db())
+        db = next(get_db())
         user = db.query(User).filter(User.email == "expiredtoken@example.com").first()
 
         raw_token, hashed_token = auth_service.generate_reset_token()
@@ -690,7 +655,7 @@ class TestResetPassword:
         )
 
         # Create a reset token
-        db = next(override_get_db())
+        db = next(get_db())
         user = db.query(User).filter(User.email == "usedtoken@example.com").first()
 
         raw_token, hashed_token = auth_service.generate_reset_token()
@@ -739,7 +704,7 @@ class TestResetPassword:
         )
 
         # Create a reset token
-        db = next(override_get_db())
+        db = next(get_db())
         user = db.query(User).filter(User.email == "weakpass@example.com").first()
 
         raw_token, hashed_token = auth_service.generate_reset_token()

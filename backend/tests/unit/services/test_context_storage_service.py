@@ -79,7 +79,7 @@ class TestContextStorageService:
         mock_embedding_service.embed.assert_called_once()
         mock_db_session.add.assert_called_once()
         mock_db_session.commit.assert_called_once()
-        mock_db_session.close.assert_called_once()
+        mock_db_session.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_store_conversation_turn_embedding_failure(
@@ -127,7 +127,7 @@ class TestContextStorageService:
         # Verify
         assert result is False  # Should return False on database failure
         mock_db_session.rollback.assert_called_once()
-        mock_db_session.close.assert_called_once()
+        mock_db_session.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_store_conversation_turn_creates_correct_metadata(
@@ -286,7 +286,7 @@ class TestContextStorageService:
         # Verify
         assert len(result) == 2
         assert result == mock_records
-        mock_db_session.close.assert_called_once()
+        mock_db_session.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_get_conversation_history_empty_result(self, mock_db_session):
@@ -323,7 +323,7 @@ class TestContextStorageService:
 
         # Verify
         assert result == []  # Should return empty list on error
-        mock_db_session.close.assert_called_once()
+        mock_db_session.close.assert_not_called()  # caller-provided session is not closed
 
 
 @pytest.mark.unit

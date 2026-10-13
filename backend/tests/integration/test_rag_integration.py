@@ -18,6 +18,10 @@ from app.services.context_retrieval_service import get_context_retrieval_service
 from app.models.database import ConversationEmbedding
 
 
+# Tests store context for user_id 1 and 2, which must exist (foreign key)
+pytestmark = pytest.mark.usefixtures("test_users")
+
+
 @pytest.mark.integration
 class TestRAGIntegration:
     """Test RAG integration in chat endpoint."""
@@ -193,11 +197,12 @@ class TestRAGIntegration:
         """
         Test that chat continues to work if context retrieval fails.
         """
-        # Given: Mock context retrieval to fail
-        mock_retrieval = AsyncMock(side_effect=Exception("Database connection failed"))
+        # Given: the database fails inside the retrieval service, which handles it
+        # and returns no context (the router itself does not catch retrieval errors)
+        broken_db = MagicMock()
+        broken_db.query.side_effect = Exception("Database connection failed")
         mocker.patch(
-            "app.routers.chat.get_context_retrieval_service",
-            return_value=MagicMock(retrieve_relevant_context=mock_retrieval)
+            "app.services.context_retrieval_service.get_db", return_value=iter([broken_db])
         )
 
         request = {
@@ -332,8 +337,10 @@ class TestRAGIntegration:
             top_k=5,
         )
 
-        assert len(contexts) >= 1
-        assert "AAPL" in contexts[0]["user_message"] or "AAPL" in contexts[0]["assistant_response"]
+        # The stored AAPL turn is retrievable (ranking order depends on the embedding model)
+        assert any(
+            "AAPL" in c["user_message"] or "AAPL" in c["assistant_response"] for c in contexts
+        )
 
         # Step 4: Wait for new conversation to be stored
         await asyncio.sleep(2)

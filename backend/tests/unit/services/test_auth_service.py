@@ -137,8 +137,11 @@ class TestAccessToken:
         user_id = 123
         token = AuthService.create_access_token(user_id=user_id)
 
-        # Tamper with the token by changing a character
-        tampered_token = token[:-1] + ("a" if token[-1] != "a" else "b")
+        # Tamper with the signature. Change its first character: the last character of a
+        # base64url segment can carry unused padding bits, so changing it may not alter the bytes.
+        header, payload, signature = token.split(".")
+        tampered_signature = ("a" if signature[0] != "a" else "b") + signature[1:]
+        tampered_token = f"{header}.{payload}.{tampered_signature}"
 
         verified_user_id = AuthService.verify_token(tampered_token)
 

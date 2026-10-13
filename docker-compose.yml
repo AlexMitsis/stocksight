@@ -48,6 +48,7 @@ services:
       - /app/.venv  # Don't mount virtual env from host
     environment:
       DATABASE_URL: postgresql://stockanalysis:devpassword@postgres:5432/stockanalysis
+      TEST_DATABASE_URL: postgresql://stockanalysis:devpassword@postgres:5432/stockanalysis_test  # pytest only
       REDIS_URL: redis://redis:6379/0
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_EMBEDDINGS_API_KEY: ${OPENAI_EMBEDDINGS_API_KEY}

@@ -1,33 +1,12 @@
 """
 Unit tests for database models.
 
-These tests verify that database models work correctly with SQLAlchemy.
+These tests verify that database models work correctly against the Postgres test database
+(db_session fixture from conftest.py).
 """
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.core.database import Base
 from app.models.database import User, Conversation, Message, ConversationEmbedding
-
-
-@pytest.fixture
-def db_session():
-    """
-    Create a fresh in-memory SQLite database for each test.
-    """
-    # Create in-memory SQLite database
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-
-    # Create session
-    Session = sessionmaker(bind=engine)
-    session = Session()
-
-    yield session
-
-    # Cleanup
-    session.close()
 
 
 @pytest.mark.unit
@@ -383,7 +362,6 @@ class TestConversationEmbeddingModel:
     These tests focus on basic CRUD operations that work with SQLite.
     """
 
-    @pytest.mark.skip(reason="Requires PostgreSQL with pgvector extension")
     def test_create_conversation_embedding(self, db_session):
         """Test creating a conversation embedding with vector."""
         # Given
@@ -420,7 +398,6 @@ class TestConversationEmbeddingModel:
         assert "AAPL" in conversation_emb.meta["tickers"]
         assert conversation_emb.created_at is not None
 
-    @pytest.mark.skip(reason="Requires PostgreSQL with pgvector extension")
     def test_query_embeddings_by_thread(self, db_session):
         """Test querying embeddings by thread_id."""
         # Given
@@ -460,7 +437,6 @@ class TestConversationEmbeddingModel:
         assert results[0].meta["turn"] == 1
         assert results[1].meta["turn"] == 2
 
-    @pytest.mark.skip(reason="Requires PostgreSQL with pgvector extension")
     def test_user_isolation(self, db_session):
         """Test that embeddings are properly isolated by user_id."""
         # Given
@@ -502,7 +478,6 @@ class TestConversationEmbeddingModel:
         assert len(user1_results) == 1
         assert user1_results[0].meta["user"] == "user1"
 
-    @pytest.mark.skip(reason="Requires PostgreSQL with pgvector extension")
     def test_metadata_storage(self, db_session):
         """Test that JSONB meta stores complex data."""
         # Given

@@ -65,13 +65,13 @@ class TestContextRetrievalService:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": ["AAPL"],
         }
-        mock_result.embedding.cosine_distance = MagicMock(return_value=0.1)  # High similarity
+        mock_result._distance = 0.1  # High similarity
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result]]
         mock_db_session.query.return_value = mock_query
 
         # Execute
@@ -90,7 +90,7 @@ class TestContextRetrievalService:
         assert contexts[0]["relevance_score"] > 0.8  # 1 - 0.1 = 0.9
         assert "AAPL" in contexts[0]["tickers"]
         mock_embedding_service.embed.assert_called_once()
-        mock_db_session.close.assert_called_once()
+        mock_db_session.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_retrieve_relevant_context_empty_results(
@@ -159,7 +159,7 @@ class TestContextRetrievalService:
 
         # Verify
         assert contexts == []  # Should return empty list
-        mock_db_session.close.assert_called_once()
+        mock_db_session.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_retrieve_relevant_context_respects_top_k(
@@ -179,14 +179,14 @@ class TestContextRetrievalService:
                 "timestamp": "2025-12-16T10:00:00",
                 "tickers": [],
             }
-            mock_result.embedding.cosine_distance = MagicMock(return_value=0.1 * i)
+            mock_result._distance = 0.1 * i
             mock_results.append(mock_result)
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = mock_results[:3]  # Simulate LIMIT 3
+        mock_query.all.return_value = [(r, r._distance) for r in mock_results[:3]]  # Simulate LIMIT 3
         mock_db_session.query.return_value = mock_query
 
         # Execute
@@ -244,7 +244,7 @@ class TestContextRetrievalService:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": [],
         }
-        mock_result1.embedding.cosine_distance = MagicMock(return_value=0.1)  # similarity = 0.9
+        mock_result1._distance = 0.1  # similarity = 0.9
 
         mock_result2 = MagicMock()
         mock_result2.meta = {
@@ -253,13 +253,13 @@ class TestContextRetrievalService:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": [],
         }
-        mock_result2.embedding.cosine_distance = MagicMock(return_value=0.5)  # similarity = 0.5
+        mock_result2._distance = 0.5  # similarity = 0.5
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result1, mock_result2]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result1, mock_result2]]
         mock_db_session.query.return_value = mock_query
 
         # Execute
@@ -388,13 +388,13 @@ class TestContextRetrievalService:
             "user_message": "Test",
             # Missing other fields
         }
-        mock_result.embedding.cosine_distance = MagicMock(return_value=0.2)
+        mock_result._distance = 0.2
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result]]
         mock_db_session.query.return_value = mock_query
 
         # Execute

@@ -5,6 +5,8 @@ Unit tests for Redis caching functionality.
 import pytest
 import time
 from unittest.mock import Mock, patch, MagicMock
+
+import pandas as pd
 from app.core.cache import cache, clear_cache_pattern
 
 
@@ -22,7 +24,10 @@ class TestCacheDecorator:
 
     def test_cache_decorator_caches_result(self, mock_redis):
         """Test that cache decorator stores and retrieves results."""
-        # Given: A cached function
+        # Given: A cached function backed by a Redis mock that actually stores values
+        store = {}
+        mock_redis.get.side_effect = store.get
+        mock_redis.setex.side_effect = lambda key, ttl, value: store.__setitem__(key, value)
         call_count = 0
 
         @cache(ttl=60, include_timestamp=True)
@@ -52,8 +57,9 @@ class TestCacheDecorator:
         # When: Function called
         result = test_function()
 
-        # Then: Function executed, Redis get called
-        assert result == {"data": "test"}
+        # Then: Function executed (timestamp added by default), Redis get called
+        assert result["data"] == "test"
+        assert "cached_at" in result
         mock_redis.get.assert_called_once()
 
     def test_cache_hit_returns_cached_value(self, mock_redis):
@@ -247,19 +253,16 @@ class TestCacheIntegrationWithTools:
 
         # Given: Mock yfinance
         mock_yf = mocker.patch("app.tools.stock_price.yf.Ticker")
-        mock_stock = Mock()
-        mock_stock.history.return_value = {"Close": [175.43]}
-        mock_stock.history.return_value.__getitem__ = lambda self, key: [175.43]
-        mock_yf.return_value = mock_stock
+        mock_yf.return_value.history.return_value = pd.DataFrame({"Close": [175.43]})
 
         # When: Fetch price (will be cached)
         result = _fetch_stock_price_cached("AAPL")
 
-        # Then: Result has expected structure
+        # Then: Result has expected structure and was written to the cache
         assert result["ticker"] == "AAPL"
-        assert "price" in result
-        assert "formatted" in result
+        assert result["price_usd"] == 175.43
         assert "cached_at" in result
+        mock_redis.setex.assert_called_once()
 
     def test_balance_sheet_caching(self, mock_redis, mocker):
         """Test that balance sheet tool uses cache correctly."""

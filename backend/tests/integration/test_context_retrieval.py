@@ -36,7 +36,7 @@ class TestContextRetrievalIntegration:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": ["AAPL"],
         }
-        mock_result1.embedding.cosine_distance = MagicMock(return_value=0.05)  # Very relevant
+        mock_result1._distance = 0.05  # Very relevant
 
         mock_result2 = MagicMock()
         mock_result2.meta = {
@@ -45,13 +45,13 @@ class TestContextRetrievalIntegration:
             "timestamp": "2025-12-16T10:05:00",
             "tickers": ["TSLA"],
         }
-        mock_result2.embedding.cosine_distance = MagicMock(return_value=0.3)  # Less relevant
+        mock_result2._distance = 0.3  # Less relevant
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result1, mock_result2]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result1, mock_result2]]
         mock_db.query.return_value = mock_query
 
         with patch(
@@ -92,13 +92,13 @@ class TestContextRetrievalIntegration:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": [],
         }
-        mock_result.embedding.cosine_distance = MagicMock(return_value=0.1)
+        mock_result._distance = 0.1
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result]]
         mock_db.query.return_value = mock_query
 
         with patch(
@@ -135,13 +135,13 @@ class TestContextRetrievalIntegration:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": [],
         }
-        mock_result.embedding.cosine_distance = MagicMock(return_value=0.1)
+        mock_result._distance = 0.1
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result]]
         mock_db.query.return_value = mock_query
 
         with patch(
@@ -211,13 +211,13 @@ class TestContextRetrievalIntegration:
             "timestamp": "2025-12-16T10:00:00",
             "tickers": ["AAPL"],
         }
-        mock_result.embedding.cosine_distance = MagicMock(return_value=0.1)
+        mock_result._distance = 0.1
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result]]
         mock_db.query.return_value = mock_query
 
         with patch(
@@ -294,7 +294,7 @@ class TestContextRetrievalIntegration:
 
             # Verify graceful failure
             assert contexts == []
-            mock_db.close.assert_called_once()
+            mock_db.close.assert_not_called()  # caller-provided session is not closed
 
     @pytest.mark.asyncio
     async def test_top_k_limit_respected(self):
@@ -314,14 +314,14 @@ class TestContextRetrievalIntegration:
                 "timestamp": "2025-12-16T10:00:00",
                 "tickers": [],
             }
-            mock_result.embedding.cosine_distance = MagicMock(return_value=0.1 * (i + 1))
+            mock_result._distance = 0.1 * (i + 1)
             mock_results.append(mock_result)
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = mock_results
+        mock_query.all.return_value = [(r, r._distance) for r in mock_results]
         mock_db.query.return_value = mock_query
 
         with patch(
@@ -367,13 +367,13 @@ class TestContextRetrievalEndToEnd:
             "tokens": 150,
             "tickers": ["AAPL"],
         }
-        mock_result.embedding.cosine_distance = MagicMock(return_value=0.08)
+        mock_result._distance = 0.08
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = [mock_result]
+        mock_query.all.return_value = [(r, r._distance) for r in [mock_result]]
         mock_db.query.return_value = mock_query
 
         with patch(
@@ -425,14 +425,14 @@ class TestContextRetrievalEndToEnd:
                 "timestamp": "2025-12-16T10:00:00",
                 "tickers": tickers,
             }
-            mock_result.embedding.cosine_distance = MagicMock(return_value=distance)
+            mock_result._distance = distance
             mock_results.append(mock_result)
 
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
         mock_query.order_by.return_value = mock_query
         mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = mock_results
+        mock_query.all.return_value = [(r, r._distance) for r in mock_results]
         mock_db.query.return_value = mock_query
 
         with patch(
