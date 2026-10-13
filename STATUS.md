@@ -80,7 +80,9 @@
 - Removed obsolete startup holdings migration (crashed on every boot) and unused `PortfolioService` write methods
 - Reset `admin@test.com` portfolio (dev test data out of sync) and re-imported `sample_portfolio.csv`
 - Frontend hot reload fixed (Vite polling) and host `npm run dev` workflow working/documented
-- Open items tracked in `PENDING_FIXES.md` (FIX-003, 009, 010)
+- Test suite green (backend 231 passed, frontend 11): dedicated Postgres test DB, mocked OpenAI/Redis, CI Postgres service
+- RAG retrieval bug fixed: similarity scoring crashed and the error was swallowed, so chat never received past context
+- Open items tracked in `PENDING_FIXES.md` (FIX-003, 009, 012, 013)
 
 ### What's Running
 
@@ -193,8 +195,8 @@ The application is fully functional with:
 - Azure Bicep IaC, GitHub Actions CD, Prometheus + Grafana
 - Plan: `docs/OBSERVABILITY_AND_DEPLOYMENT_PLAN.md`
 
-### Option 2: Test Suite Health (FIX-010)
-- 26 failing / 40 erroring backend tests and 4 obsolete frontend App tests; clean up before relying on CI
+### Option 2: CI Lint/Type-Check Cleanup (FIX-012)
+- Tests are green; black/flake8/mypy/eslint/tsc jobs still fail on existing code
 
 ### Option 3: Story 3.7 - Local Data Lake (21 points)
 - PostgreSQL data lake with S&P 500 stocks, DB-first agent

@@ -393,8 +393,12 @@ docker compose exec backend alembic upgrade head
 
 ### 4. Run Tests
 ```bash
-docker compose exec backend pytest
+docker compose exec backend pytest          # backend (uses the stockanalysis_test database)
+docker compose exec frontend npx vitest run # frontend
 ```
+- Backend tests run against a separate `stockanalysis_test` Postgres database (`TEST_DATABASE_URL`), created and migrated automatically; tests refuse to run against a database whose name doesn't end in `_test`.
+- OpenAI calls are mocked (embeddings use a deterministic fake) and the Redis cache is disabled, so tests are free and deterministic.
+- RAG retrieval-quality tests use real, paid embeddings and are excluded by default: `docker compose exec backend pytest -m quality`.
 
 ### 5. Commit Changes
 ```bash
